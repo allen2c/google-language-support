@@ -227,3 +227,156 @@ class LanguageCodes(StrEnum):
             return special_names[self.value]
 
         return self.name.replace("_", " ").title()
+
+    @classmethod
+    def _get_iso_mappings(cls) -> dict[str, "LanguageCodes"]:
+        """Get mappings for ISO 639-1 and 639-3 language codes."""
+        # Mapping: (iso_639_1, iso_639_3) -> LanguageCode
+        iso_pairs = [
+            ("af", "afr", cls.AFRIKAANS),
+            ("sq", "sqi", cls.ALBANIAN),
+            ("ar", "ara", cls.ARABIC),
+            ("hy", "hye", cls.ARMENIAN),
+            ("az", "aze", cls.AZERBAIJANI),
+            ("eu", "eus", cls.BASQUE),
+            ("be", "bel", cls.BELARUSIAN),
+            ("bn", "ben", cls.BENGALI),
+            ("bs", "bos", cls.BOSNIAN),
+            ("bg", "bul", cls.BULGARIAN),
+            ("ca", "cat", cls.CATALAN),
+            ("zh", "zho", cls.CHINESE_SIMPLIFIED_2),
+            ("hr", "hrv", cls.CROATIAN),
+            ("cs", "ces", cls.CZECH),
+            ("da", "dan", cls.DANISH),
+            ("nl", "nld", cls.DUTCH),
+            ("en", "eng", cls.ENGLISH),
+            ("eo", "epo", cls.ESPERANTO),
+            ("et", "est", cls.ESTONIAN),
+            ("fi", "fin", cls.FINNISH),
+            ("fr", "fra", cls.FRENCH),
+            ("ga", "gle", cls.IRISH),
+            ("ka", "kat", cls.GEORGIAN),
+            ("de", "deu", cls.GERMAN),
+            ("el", "ell", cls.GREEK),
+            ("gu", "guj", cls.GUJARATI),
+            ("he", "heb", cls.HEBREW_2),
+            ("hi", "hin", cls.HINDI),
+            ("hu", "hun", cls.HUNGARIAN),
+            ("is", "isl", cls.ICELANDIC),
+            ("id", "ind", cls.INDONESIAN),
+            ("it", "ita", cls.ITALIAN),
+            ("ja", "jpn", cls.JAPANESE),
+            ("kk", "kaz", cls.KAZAKH),
+            ("ko", "kor", cls.KOREAN),
+            ("la", "lat", cls.LATIN),
+            ("lv", "lav", cls.LATVIAN),
+            ("lt", "lit", cls.LITHUANIAN),
+            ("mk", "mkd", cls.MACEDONIAN),
+            ("ms", "msa", cls.MALAY),
+            ("mi", "mri", cls.MAORI),
+            ("mr", "mar", cls.MARATHI),
+            ("mn", "mon", cls.MONGOLIAN),
+            ("fa", "fas", cls.PERSIAN),
+            ("pl", "pol", cls.POLISH),
+            ("pt", "por", cls.PORTUGUESE),
+            ("pa", "pan", cls.PUNJABI),
+            ("ro", "ron", cls.ROMANIAN),
+            ("ru", "rus", cls.RUSSIAN),
+            ("sr", "srp", cls.SERBIAN),
+            ("sn", "sna", cls.SHONA),
+            ("sk", "slk", cls.SLOVAK),
+            ("sl", "slv", cls.SLOVENIAN),
+            ("so", "som", cls.SOMALI),
+            ("st", "sot", cls.SESOTHO),
+            ("es", "spa", cls.SPANISH),
+            ("sw", "swa", cls.SWAHILI),
+            ("sv", "swe", cls.SWEDISH),
+            ("tl", "tgl", cls.FILIPINO_TAGALOG_2),
+            ("ta", "tam", cls.TAMIL),
+            ("te", "tel", cls.TELUGU),
+            ("th", "tha", cls.THAI),
+            ("tn", "tsn", cls.TSWANA),
+            ("ts", "tso", cls.TSONGA),
+            ("tr", "tur", cls.TURKISH),
+            ("uk", "ukr", cls.UKRAINIAN),
+            ("ur", "urd", cls.URDU),
+            ("vi", "vie", cls.VIETNAMESE),
+            ("cy", "cym", cls.WELSH),
+            ("xh", "xho", cls.XHOSA),
+            ("yo", "yor", cls.YORUBA),
+            ("zu", "zul", cls.ZULU),
+            ("lg", "lug", cls.GANDA_LUGANDA),
+        ]
+
+        mapping = {}
+        for iso1, iso3, lang_code in iso_pairs:
+            mapping[iso1.upper()] = lang_code
+            mapping[iso3.upper()] = lang_code
+
+        # Special cases
+        mapping.update(
+            {
+                "IW": cls.HEBREW,  # Alternative Hebrew code
+                "NB": cls.NORWEGIAN,
+                "NOB": cls.NORWEGIAN,  # Bokmål
+                "NN": cls.NORWEGIAN,
+                "NNO": cls.NORWEGIAN,  # Nynorsk
+            }
+        )
+
+        return mapping
+
+    @classmethod
+    def _get_common_name_mappings(cls) -> dict[str, "LanguageCodes"]:
+        """Get mappings for common language name variations."""
+        return {
+            "CHINESE": cls.CHINESE_SIMPLIFIED_2,
+            "TAGALOG": cls.FILIPINO_TAGALOG_2,
+            "FILIPINO": cls.FILIPINO_TAGALOG_2,
+            "GANDA": cls.GANDA_LUGANDA,
+            "LUGANDA": cls.GANDA_LUGANDA,
+            "SOTHO": cls.SESOTHO,
+            "SLOVENE": cls.SLOVENIAN,
+            "BOKMAL": cls.NORWEGIAN,
+            "NYNORSK": cls.NORWEGIAN,
+        }
+
+    @classmethod
+    def from_common_name(cls, name: str) -> "LanguageCodes":
+        """
+        Convert a common language name to a LanguageCodes enum.
+
+        Supports case-insensitive matching for:
+        - Enum names (e.g., "ENGLISH", "english")
+        - Language codes (e.g., "en", "EN")
+        - ISO 639-1/639-3 codes (e.g., "en"/"eng", "es"/"spa")
+        - Common name variations (e.g., "Chinese", "Tagalog")
+        - Instruction names from to_instruction()
+        """
+        normalized = name.upper().strip()
+
+        # Try direct enum name match
+        if hasattr(cls, normalized):
+            return getattr(cls, normalized)
+
+        # Try direct value match (language codes)
+        for lang_code in cls:
+            if lang_code.value.upper() == normalized:
+                return lang_code
+
+        # Try ISO code mappings
+        iso_mappings = cls._get_iso_mappings()
+        if normalized in iso_mappings:
+            return iso_mappings[normalized]
+
+        # Try common name variations
+        common_mappings = cls._get_common_name_mappings()
+        if normalized in common_mappings:
+            return common_mappings[normalized]
+
+        # Try instruction names
+        for lang_code in cls:
+            if lang_code.to_instruction().upper() == normalized:
+                return lang_code
+
+        raise ValueError(f"Language '{name}' not found in supported languages")
