@@ -3,6 +3,8 @@ import re
 import typing
 from enum import StrEnum
 
+__version__ = "0.2.0"
+
 
 class LanguageCodes(StrEnum):
     ABKHAZ = "ab"
