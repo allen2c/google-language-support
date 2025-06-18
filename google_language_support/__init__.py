@@ -1,3 +1,5 @@
+import difflib
+import re
 from enum import StrEnum
 
 
@@ -228,6 +230,22 @@ class LanguageCodes(StrEnum):
 
         return self.name.replace("_", " ").title()
 
+    @staticmethod
+    def _normalize_for_comparison(text: str) -> str:
+        """
+        Normalize text for comparison by removing punctuation and extra spaces.
+
+        Examples:
+        - "Chinese, Simplified, China" -> "CHINESE SIMPLIFIED CHINA"
+        - "Filipino (Tagalog)" -> "FILIPINO TAGALOG"
+        - "Malay, Jawi (Arabic Script)" -> "MALAY JAWI ARABIC SCRIPT"
+        """
+        # Remove punctuation and normalize spaces
+        normalized = re.sub(r"[^\w\s]", " ", text.upper())
+        # Replace multiple spaces with single space and strip
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return normalized
+
     @classmethod
     def _get_iso_mappings(cls) -> dict[str, "LanguageCodes"]:
         """Get mappings for ISO 639-1 and 639-3 language codes."""
@@ -342,6 +360,128 @@ class LanguageCodes(StrEnum):
         }
 
     @classmethod
+    def _get_cultural_name_mappings(cls) -> dict[str, "LanguageCodes"]:
+        """Get mappings for cultural/native language names."""
+        return {
+            # Native language names
+            "MANDARIN": cls.CHINESE_SIMPLIFIED_2,
+            "FARSI": cls.PERSIAN,
+            "DEUTSCH": cls.GERMAN,
+            "ESPAÑOL": cls.SPANISH,
+            "FRANÇAIS": cls.FRENCH,
+            "ITALIANO": cls.ITALIAN,
+            "PORTUGUÊS": cls.PORTUGUESE,
+            "NEDERLANDS": cls.DUTCH,
+            "SVENSKA": cls.SWEDISH,
+            "NORSK": cls.NORWEGIAN,
+            "SUOMI": cls.FINNISH,
+            "ΕΛΛΗΝΙΚΆ": cls.GREEK,
+            "TÜRKÇE": cls.TURKISH,
+            "עברית": cls.HEBREW_2,
+            "العربية": cls.ARABIC,
+            "हिन्दी": cls.HINDI,
+            "বাংলা": cls.BENGALI,
+            "தமிழ்": cls.TAMIL,
+            "తెలుగు": cls.TELUGU,
+            "ไทย": cls.THAI,
+            "TIẾNG VIỆT": cls.VIETNAMESE,
+            "BAHASA INDONESIA": cls.INDONESIAN,
+            "BAHASA MELAYU": cls.MALAY,
+        }
+
+    @classmethod
+    def _get_casual_variant_mappings(cls) -> dict[str, "LanguageCodes"]:
+        """Get mappings for casual/colloquial language variants."""
+        return {
+            # Chinese variants
+            "CHINESE SIMPLIFIED": cls.CHINESE_SIMPLIFIED,
+            "CHINESE TRADITIONAL": cls.CHINESE_TRADITIONAL,
+            "SIMPLIFIED CHINESE": cls.CHINESE_SIMPLIFIED,
+            "TRADITIONAL CHINESE": cls.CHINESE_TRADITIONAL,
+            "MANDARIN CHINESE": cls.CHINESE_SIMPLIFIED_2,
+            # Spanish variants
+            "MEXICAN SPANISH": cls.SPANISH,
+            "LATIN AMERICAN SPANISH": cls.SPANISH,
+            "CASTILIAN": cls.SPANISH,
+            # Portuguese variants
+            "BRAZILIAN PORTUGUESE": cls.PORTUGUESE_BR,
+            "EUROPEAN PORTUGUESE": cls.PORTUGUESE_PT,
+            # French variants
+            "CANADIAN FRENCH": cls.FRENCH_CA,
+            "QUEBEC FRENCH": cls.FRENCH_CA,
+            # English variants (all map to English)
+            "AMERICAN ENGLISH": cls.ENGLISH,
+            "BRITISH ENGLISH": cls.ENGLISH,
+            "AUSTRALIAN ENGLISH": cls.ENGLISH,
+            "INDIAN ENGLISH": cls.ENGLISH,
+            # Short forms
+            "CHIN": cls.CHINESE_SIMPLIFIED_2,
+            "JAP": cls.JAPANESE,
+            "SPAN": cls.SPANISH,
+            "PORT": cls.PORTUGUESE,
+            "RUSS": cls.RUSSIAN,
+            # Writing systems/cultural references (map to primary language)
+            "PINYIN": cls.CHINESE_SIMPLIFIED_2,  # Chinese romanization
+            "KANJI": cls.JAPANESE,  # Japanese writing system
+            "HANGUL": cls.KOREAN,  # Korean writing system
+            "CYRILLIC": cls.RUSSIAN,  # Slavic script - map to Russian as primary
+        }
+
+    @classmethod
+    def _get_all_possible_names(cls) -> dict[str, "LanguageCodes"]:
+        """Get all possible names mapped to their corresponding LanguageCodes."""
+        all_names = {}
+
+        # Combine all mapping methods
+        all_names.update(cls._get_iso_mappings())
+        all_names.update(cls._get_common_name_mappings())
+        all_names.update(cls._get_cultural_name_mappings())
+        all_names.update(cls._get_casual_variant_mappings())
+
+        # Add enum names and values
+        for lang_code in cls:
+            all_names[lang_code.name] = lang_code
+            all_names[lang_code.value.upper()] = lang_code
+            # Add both original and normalized instruction names
+            instruction_original = lang_code.to_instruction().upper()
+            instruction_normalized = cls._normalize_for_comparison(
+                lang_code.to_instruction()
+            )
+            all_names[instruction_original] = lang_code
+            all_names[instruction_normalized] = lang_code
+
+        return all_names
+
+    @classmethod
+    def _find_similar_match(
+        cls, target: str, threshold: float = 0.8
+    ) -> "LanguageCodes | None":
+        """Find the best matching language using character similarity."""
+        all_names = cls._get_all_possible_names()
+        best_match = None
+        best_ratio = 0.0
+
+        for name, lang_code in all_names.items():
+            # Try exact similarity
+            ratio = difflib.SequenceMatcher(None, target, name).ratio()
+            if ratio > best_ratio and ratio >= threshold:
+                best_ratio = ratio
+                best_match = lang_code
+
+            # Also try partial matching for longer strings
+            if len(target) >= 3 and len(name) >= 3:
+                # Check if target is a substring of name or vice versa
+                if target in name or name in target:
+                    substring_ratio = min(len(target), len(name)) / max(
+                        len(target), len(name)
+                    )
+                    if substring_ratio >= 0.6 and substring_ratio > best_ratio:
+                        best_ratio = substring_ratio
+                        best_match = lang_code
+
+        return best_match if best_ratio >= threshold else None
+
+    @classmethod
     def from_common_name(cls, name: str) -> "LanguageCodes":
         """
         Convert a common language name to a LanguageCodes enum.
@@ -351,9 +491,16 @@ class LanguageCodes(StrEnum):
         - Language codes (e.g., "en", "EN")
         - ISO 639-1/639-3 codes (e.g., "en"/"eng", "es"/"spa")
         - Common name variations (e.g., "Chinese", "Tagalog")
+        - Cultural/native names (e.g., "Mandarin", "Farsi", "Deutsch")
+        - Casual variants (e.g., "Brazilian Portuguese", "British English")
+        - Writing systems (e.g., "Pinyin", "Kanji", "Hangul")
         - Instruction names from to_instruction()
+        - Fuzzy matching for typos and variations (e.g., "Englsh" -> "English")
+
+        Uses character similarity as a fallback with 80% threshold for flexibility.
         """
         normalized = name.upper().strip()
+        normalized_for_punctuation = cls._normalize_for_comparison(name)
 
         # Try direct enum name match
         if hasattr(cls, normalized):
@@ -374,9 +521,27 @@ class LanguageCodes(StrEnum):
         if normalized in common_mappings:
             return common_mappings[normalized]
 
+        # Try cultural/native language names
+        cultural_mappings = cls._get_cultural_name_mappings()
+        if normalized in cultural_mappings:
+            return cultural_mappings[normalized]
+
+        # Try casual/colloquial variants
+        casual_mappings = cls._get_casual_variant_mappings()
+        if normalized in casual_mappings:
+            return casual_mappings[normalized]
+
         # Try instruction names
         for lang_code in cls:
-            if lang_code.to_instruction().upper() == normalized:
+            instruction_normalized = cls._normalize_for_comparison(
+                lang_code.to_instruction()
+            )
+            if instruction_normalized == normalized_for_punctuation:
                 return lang_code
+
+        # Try character similarity as final fallback
+        similar_match = cls._find_similar_match(normalized_for_punctuation)
+        if similar_match:
+            return similar_match
 
         raise ValueError(f"Language '{name}' not found in supported languages")
