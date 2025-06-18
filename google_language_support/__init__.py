@@ -1,5 +1,6 @@
 import difflib
 import re
+import typing
 from enum import StrEnum
 
 
@@ -545,3 +546,10 @@ class LanguageCodes(StrEnum):
             return similar_match
 
         raise ValueError(f"Language '{name}' not found in supported languages")
+
+    @classmethod
+    def from_might_common_name(cls, name: str) -> typing.Optional["LanguageCodes"]:
+        try:
+            return cls.from_common_name(name)
+        except ValueError:
+            return None
